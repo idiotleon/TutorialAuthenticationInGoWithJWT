@@ -2,8 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/auth0/go-jwt-middleware"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"net/http"
+	"os"
+	"time"
 )
 
 func main() {
@@ -17,16 +22,18 @@ func main() {
 	r.Handle("/status", StatusHandler).Methods("GET")
 
 	// To retrieve a list of products that the user can leave feedback on
-	r.Handle("/products", ProductsHandler).Methods("GET")
+	r.Handle("/products", jwtMiddleware.Handler(ProductsHandler)).Methods("GET")
 
 	// To capture user feedback on products
-	r.Handle("/products/{slug}/feedback", AddFeedbackHandler).Methods("POST")
+	r.Handle("/products/{slug}/feedback", jwtMiddleware.Handler(AddFeedbackHandler)).Methods("POST")
 
 	// To setup the server so one can serve static assets like images, css
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("/static"))))
 
+	r.Handle("/get-token", GetTokenHandler).Methods("GET")
+
 	// To declare the port and pass in the router
-	http.ListenAndServe(":3000", r)
+	http.ListenAndServe(":3000", handlers.LoggingHandler(os.Stdout, r))
 }
 
 var NotImplemented = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -79,4 +86,35 @@ var AddFeedbackHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Re
 	} else {
 		w.Write([]byte("Product Not Found"))
 	}
+})
+
+// To set a global string for our secret
+var mySigningKey = []byte("secret")
+
+var GetTokenHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// To create the token
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	// To create a map to store claims
+	claims := token.Claims.(jwt.MapClaims)
+
+	// To set token claims
+	// Hard-coded claims
+	claims["admin"] = true
+	claims["name"] = "Leon"
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+	// To sign the token with our secret
+	tokenString, _ := token.SignedString(mySigningKey)
+
+	// To write the token to the browser window
+	w.Write([]byte(tokenString))
+})
+
+// To verify the token
+var jwtMiddleware = jwtmiddleware.New(jwtmiddleware.Options{
+	ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
+		return mySigningKey, nil
+	},
+	SigningMethod: jwt.SigningMethodHS256,
 })
