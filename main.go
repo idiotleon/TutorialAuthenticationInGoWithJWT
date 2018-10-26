@@ -27,8 +27,8 @@ func main() {
 	// To capture user feedback on products
 	r.Handle("/products/{slug}/feedback", jwtMiddleware.Handler(AddFeedbackHandler)).Methods("POST")
 
-	// To setup the server so one can serve static assets like images, css
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("/static"))))
+	// To setup the server so one can serve static assets like images, css, js
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("./static"))))
 
 	r.Handle("/get-token", GetTokenHandler).Methods("GET")
 
